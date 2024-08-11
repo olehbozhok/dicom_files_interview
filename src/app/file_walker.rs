@@ -1,7 +1,6 @@
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::sync::mpsc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -32,13 +31,13 @@ impl DirJob {
             .map_err(|err| JobError::Dir(self.0, err))?
             .map(|res| {
                 res.map(|e| e.path())
-                    .map_err(|err| Into::<JobError>::into(err))
+                    .map_err(Into::<JobError>::into)
             })
             .map(|path_result| path_result.and_then(check_path))
             .collect::<Result<Vec<_>, JobError>>()
     }
 
-    fn do_job<'a>(self, scope: &rayon::Scope<'a>) -> Result<(), JobError> {
+    fn do_job(self, scope: &rayon::Scope<'_>) -> Result<(), JobError> {
         self.scan_jobs()?.into_iter().for_each(|entry| {
             scope.spawn(move |s| do_job(entry, s)) // Recursive call here
         });
@@ -81,7 +80,7 @@ fn check_path(path: PathBuf) -> Result<JobsType, JobError> {
     }
 }
 
-fn do_job_result<'a>(job: JobsType, scope: &rayon::Scope<'a>) -> Result<(), JobError> {
+fn do_job_result(job: JobsType, scope: &rayon::Scope<'_>) -> Result<(), JobError> {
     match job {
         JobsType::Dir(dir_job) => dir_job.do_job(scope)?,
         JobsType::File(file_job) => file_job.do_job()?,
@@ -91,7 +90,7 @@ fn do_job_result<'a>(job: JobsType, scope: &rayon::Scope<'a>) -> Result<(), JobE
     Ok(())
 }
 
-fn do_job<'a>(job: JobsType, scope: &rayon::Scope<'a>) {
+fn do_job(job: JobsType, scope: &rayon::Scope<'_>) {
     if let Err(err) = do_job_result(job, scope) {
         log::error!("got error on handle:{err}")
     }
