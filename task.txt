@@ -1,0 +1,42 @@
+Software Engineer: Rust
+Data interoperability and image processing focus
+Assignment
+Prototype a CLI utility in Rust that catalogs DICOM files.
+Task Overview
+DICOM stands for “Digital Imaging and Communications in Medicine” and is the most common open standard for medical images. Each DICOM file contains a set of metadata about the patient, clinic, and acquisition, followed by the pixel data or contents of the acquisition itself.
+
+Hospitals often collect all their DICOM files into a single large, shared drive. The goal of this command-line utility is to catalog the patients in such a drive, and help users identify files related to a specific patient for further analysis. A large clinic may store millions of files with paths such as “drive/1234/001/0001234.dcm”, making it difficult to locate the right files without a catalog.
+
+The CLI utility should:
+Locate DICOM files under a specified path.
+Print each file's DICOM patient name and patient ID.
+
+This task is intended to assess your ability to create a practical utility from scratch, utilizing external libraries and following Rust's best practices. We estimate that this task will take up to 2 hours of your time, assuming you have the right level of experience and no prior familiarity with the DICOM standard itself.
+Minimum Requirements
+File Traversal: Traverse the directory tree, starting with the specified path. Will you prefer a single-threaded or a multi-threaded approach? What are the tradeoffs?
+DICOM Parsing: For each DICOM file encountered, extract the PersonName (0x0010, 0x0010) and the PatientID (0x0010, 0x0020).
+Note: DICOM files are not required to have a .dcm extension!
+Error Handling: Handle errors gracefully and avoid crashing on non-DICOM or unreadable DICOM files.
+Output: Print the file path, patient name and patient id in a format suitable for a catalog.
+Command-Line Interface: Implement argument parsing for inputting the path.
+
+You can find example DICOM files for testing in https://barre.dev/medical/samples/ and https://www.aylward.org/notes/open-access-medical-image-repositories.
+Implementation Details
+Language: Rust
+Libraries: You may use any library from Cargo. DICOM-rs is a popular library for parsing DICOM files.
+Documentation: Include a brief README file explaining:
+How to build and use this utility?
+Any specific considerations and assumptions we should keep in mind when reviewing the code?
+Testing: Test coverage is appreciated but not required for this prototype. What would you test for production? Why? Be prepared for such questions during the interview itself.
+Environment: Your code should compile on the latest stable version of Rust on Linux, MacOS or Windows (your choice.)
+AI assistants: You may use AI assistants for this exercise (e.g. VS Copilot, GPT or similar), provided you disclose their use. In our experience, assistants can be helpful but generally produce junior-quality Rust code (even GPT4) – so use your best judgment.
+Submission
+Submit your code as a .zip archive containing the complete source tree. Ensure the file structure adheres to standard Rust project conventions (e.g. using Cargo).
+
+We will only use this code for the interview itself and will not share or use it for any other purpose.
+Evaluation Criteria
+Rust code readability and structure
+Adherence to the specified minimum requirements
+Engineering soundness
+
+This assignment will be a topic of discussion during your interview, where we ask you to walk us through your design choices, and ask questions about your design choices, challenges faced, and areas of interest in the codebase.
