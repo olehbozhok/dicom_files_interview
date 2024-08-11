@@ -9,7 +9,7 @@ pub struct Cli {
     /// Count of reader workers, may be usefull to increase value, if you use ssd hard drive.
     #[arg(default_value_t = 1)]
     #[arg(short, long)]
-    pub num_workers: u16,
+    pub num_workers: usize,
     /// Set the output format to TEXT or CSV.
     #[arg(value_enum)]
     #[arg(default_value_t = OutputFormat::Text)]

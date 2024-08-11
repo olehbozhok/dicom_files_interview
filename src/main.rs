@@ -8,10 +8,7 @@ fn main() {
 
     let config = get_config();
 
-    if let Err(err) = app::start_handle_job(config.path.clone()) {
-        let string_path = config.path.to_string_lossy();
-        log::error!("could not start handle {string_path}, err: {err}")
+    if let Err(err) = app::App::new(config).start_handle() {
+        log::error!("error: {err}")
     }
-
-    println!("Hello, world!");
 }

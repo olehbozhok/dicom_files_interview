@@ -7,6 +7,8 @@ use thiserror::Error;
 pub enum JobError {
     #[error("could not read directory: `{0}`, err: {1}")]
     Dir(PathBuf, io::Error),
+    #[error("could not handle path: `{0}`")]
+    UndefinedPath(PathBuf),
     #[error("io error: {0}")]
     IO(#[from] io::Error),
 
@@ -29,10 +31,7 @@ impl DirJob {
     fn scan_jobs<'a>(self) -> Result<Vec<JobsType>, JobError> {
         fs::read_dir(&self.0)
             .map_err(|err| JobError::Dir(self.0, err))?
-            .map(|res| {
-                res.map(|e| e.path())
-                    .map_err(Into::<JobError>::into)
-            })
+            .map(|res| res.map(|e| e.path()).map_err(Into::<JobError>::into))
             .map(|path_result| path_result.and_then(check_path))
             .collect::<Result<Vec<_>, JobError>>()
     }
@@ -51,6 +50,7 @@ struct FileJob(PathBuf);
 impl FileJob {
     fn do_job<'a>(self) -> Result<(), JobError> {
         let string_path = self.0.to_string_lossy();
+        // TODO: handle file
         println!("file path: {string_path}");
         Ok(())
     }
@@ -60,9 +60,8 @@ impl FileJob {
 struct UndefinedPathJob(PathBuf);
 
 impl UndefinedPathJob {
-    fn do_job<'a>(self) {
-        let string_path = self.0.to_string_lossy();
-        log::error!("could not handle path: {string_path}");
+    fn do_job<'a>(self) -> Result<(), JobError> {
+        Err(JobError::UndefinedPath(self.0))
     }
 }
 
@@ -84,7 +83,7 @@ fn do_job_result(job: JobsType, scope: &rayon::Scope<'_>) -> Result<(), JobError
     match job {
         JobsType::Dir(dir_job) => dir_job.do_job(scope)?,
         JobsType::File(file_job) => file_job.do_job()?,
-        JobsType::UndefinedPath(job) => job.do_job(),
+        JobsType::UndefinedPath(job) => job.do_job()?,
     }
 
     Ok(())
@@ -96,15 +95,9 @@ fn do_job(job: JobsType, scope: &rayon::Scope<'_>) {
     }
 }
 
-pub fn start_handle_job(path: PathBuf) -> Result<(), JobError> {
+pub fn start_job(path: PathBuf, pool: rayon::ThreadPool) -> Result<(), JobError> {
     let first_job = check_path(path)?;
 
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(2)
-        .build()
-        .unwrap();
-
     pool.scope(|scope| do_job(first_job, scope));
-
     Ok(())
 }
