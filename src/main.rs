@@ -1,3 +1,4 @@
+#[deny(clippy::unwrap_used)]
 mod app_config;
 use app_config::get_config;
 

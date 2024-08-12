@@ -1,6 +1,9 @@
+use super::dicom_file_reader::{self, DicomError, DicomFileData};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -14,6 +17,9 @@ pub enum JobError {
 
     #[error("could not start rayon thread pull: {0}")]
     RayonBuild(#[from] rayon::ThreadPoolBuildError),
+
+    #[error("could not handle dicom file: {0}")]
+    Dicom(#[from] DicomError),
 }
 
 #[derive(Debug)]
@@ -36,11 +42,30 @@ impl DirJob {
             .collect::<Result<Vec<_>, JobError>>()
     }
 
-    fn do_job(self, scope: &rayon::Scope<'_>) -> Result<(), JobError> {
+    fn do_job(self, scope: &rayon::Scope<'_>, ctx: JobCtx) -> Result<(), JobError> {
         self.scan_jobs()?.into_iter().for_each(|entry| {
-            scope.spawn(move |s| do_job(entry, s)) // Recursive call here
+            let ctx = ctx.clone();
+            scope.spawn(move |s| do_job(entry, s, ctx.clone())) // Recursive call here
         });
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct JobCtx {
+    tx: Sender<DicomFileData>,
+}
+
+impl JobCtx {
+    pub fn new() -> (JobCtx, mpsc::Receiver<DicomFileData>) {
+        let (tx, rx) = mpsc::channel();
+        (JobCtx { tx }, rx)
+    }
+
+    fn send(&self, data: DicomFileData) {
+        if let Err(_err) = self.tx.send(data) {
+            log::error!("could not send DicomFileData to tx")
+        }
     }
 }
 
@@ -48,10 +73,9 @@ impl DirJob {
 struct FileJob(PathBuf);
 
 impl FileJob {
-    fn do_job<'a>(self) -> Result<(), JobError> {
-        let string_path = self.0.to_string_lossy();
-        // TODO: handle file
-        println!("file path: {string_path}");
+    fn do_job<'a>(self, ctx: JobCtx) -> Result<(), JobError> {
+        let file_data = dicom_file_reader::handle_file(self.0.clone())?;
+        ctx.send(file_data);
         Ok(())
     }
 }
@@ -79,25 +103,25 @@ fn check_path(path: PathBuf) -> Result<JobsType, JobError> {
     }
 }
 
-fn do_job_result(job: JobsType, scope: &rayon::Scope<'_>) -> Result<(), JobError> {
+fn do_job_result(job: JobsType, scope: &rayon::Scope<'_>, ctx: JobCtx) -> Result<(), JobError> {
     match job {
-        JobsType::Dir(dir_job) => dir_job.do_job(scope)?,
-        JobsType::File(file_job) => file_job.do_job()?,
+        JobsType::Dir(dir_job) => dir_job.do_job(scope, ctx.clone())?,
+        JobsType::File(file_job) => file_job.do_job(ctx)?,
         JobsType::UndefinedPath(job) => job.do_job()?,
     }
 
     Ok(())
 }
 
-fn do_job(job: JobsType, scope: &rayon::Scope<'_>) {
-    if let Err(err) = do_job_result(job, scope) {
+fn do_job(job: JobsType, scope: &rayon::Scope<'_>, ctx: JobCtx) {
+    if let Err(err) = do_job_result(job, scope, ctx) {
         log::error!("got error on handle:{err}")
     }
 }
 
-pub fn start_job(path: PathBuf, pool: rayon::ThreadPool) -> Result<(), JobError> {
+pub fn start_job(path: PathBuf, pool: rayon::ThreadPool, ctx: JobCtx) -> Result<(), JobError> {
     let first_job = check_path(path)?;
 
-    pool.scope(|scope| do_job(first_job, scope));
+    pool.scope(|scope| do_job(first_job, scope, ctx));
     Ok(())
 }
