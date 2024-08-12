@@ -7,7 +7,7 @@ use dicom::object::{open_file, AccessError, FileDicomObject, ReadError};
 
 #[derive(Error, Debug)]
 pub enum DicomError {
-    #[error("could not read file as dicom: {0}, path: {1}")]
+    #[error("could not read file: {0}, path: {1}")]
     Read(ReadError, PathBuf),
 
     #[error("could not handle patient name: {0}, path: {1}")]
