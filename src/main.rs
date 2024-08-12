@@ -1,5 +1,8 @@
-#[deny(clippy::unwrap_used)]
-use std::process::ExitCode;
+#![deny(clippy::unwrap_used)]
+use std::{
+    io::{stderr, Write},
+    process::ExitCode,
+};
 
 mod app_config;
 use app_config::get_config;
@@ -7,7 +10,13 @@ use app_config::get_config;
 mod app;
 
 fn main() -> ExitCode {
-    stderrlog::new().module(module_path!()).init().unwrap();
+    if let Err(err) = stderrlog::new()
+        .module(module_path!())
+        .verbosity(log::Level::Info)
+        .init()
+    {
+        _ = stderr().write_all(format!("error on init logger: {err}").as_bytes());
+    };
 
     let config = get_config();
 
@@ -15,6 +24,7 @@ fn main() -> ExitCode {
         log::error!("error: {err}");
         ExitCode::FAILURE
     } else {
+        log::info!("done");
         ExitCode::SUCCESS
     }
 }
