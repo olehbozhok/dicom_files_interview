@@ -4,6 +4,7 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -42,10 +43,10 @@ impl DirJob {
             .collect::<Result<Vec<_>, JobError>>()
     }
 
-    fn do_job(self, scope: &rayon::Scope<'_>, ctx: JobCtx) -> Result<(), JobError> {
+    fn do_job(self, ctx: JobCtx) -> Result<(), JobError> {
         self.scan_jobs()?.into_iter().for_each(|entry| {
             let ctx = ctx.clone();
-            scope.spawn(move |s| do_job(entry, s, ctx.clone())) // Recursive call here
+            ctx.run_job_parralel(entry); // Recursive call here
         });
         Ok(())
     }
@@ -54,18 +55,30 @@ impl DirJob {
 #[derive(Clone)]
 pub struct JobCtx {
     tx: Sender<DicomFileData>,
+    pub pool: Arc<rayon::ThreadPool>,
 }
 
 impl JobCtx {
-    pub fn new() -> (JobCtx, mpsc::Receiver<DicomFileData>) {
+    pub fn new(pool: rayon::ThreadPool) -> (JobCtx, mpsc::Receiver<DicomFileData>) {
         let (tx, rx) = mpsc::channel();
-        (JobCtx { tx }, rx)
+        (
+            JobCtx {
+                tx,
+                pool: Arc::new(pool),
+            },
+            rx,
+        )
     }
 
     fn send(&self, data: DicomFileData) {
         if let Err(_err) = self.tx.send(data) {
             log::error!("could not send DicomFileData to tx")
         }
+    }
+
+    fn run_job_parralel(&self, job: JobsType) {
+        let ctx_clone = self.clone();
+        self.pool.spawn(move || do_job(job, ctx_clone));
     }
 }
 
@@ -103,9 +116,9 @@ fn check_path(path: PathBuf) -> Result<JobsType, JobError> {
     }
 }
 
-fn do_job_result(job: JobsType, scope: &rayon::Scope<'_>, ctx: JobCtx) -> Result<(), JobError> {
+fn do_job_result(job: JobsType, ctx: JobCtx) -> Result<(), JobError> {
     match job {
-        JobsType::Dir(dir_job) => dir_job.do_job(scope, ctx.clone())?,
+        JobsType::Dir(dir_job) => dir_job.do_job(ctx.clone())?,
         JobsType::File(file_job) => file_job.do_job(ctx)?,
         JobsType::UndefinedPath(job) => job.do_job()?,
     }
@@ -113,15 +126,15 @@ fn do_job_result(job: JobsType, scope: &rayon::Scope<'_>, ctx: JobCtx) -> Result
     Ok(())
 }
 
-fn do_job(job: JobsType, scope: &rayon::Scope<'_>, ctx: JobCtx) {
-    if let Err(err) = do_job_result(job, scope, ctx) {
+fn do_job(job: JobsType, ctx: JobCtx) {
+    if let Err(err) = do_job_result(job, ctx) {
         log::error!("got error on handle:{err}")
     }
 }
 
-pub fn start_job(path: PathBuf, pool: rayon::ThreadPool, ctx: JobCtx) -> Result<(), JobError> {
+pub fn start_job(path: PathBuf, ctx: JobCtx) -> Result<(), JobError> {
     let first_job = check_path(path)?;
 
-    pool.scope(|scope| do_job(first_job, scope, ctx));
+    ctx.run_job_parralel(first_job);
     Ok(())
 }

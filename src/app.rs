@@ -37,12 +37,13 @@ impl App {
     }
 
     pub fn start_handle(&self) -> Result<(), AppError> {
-        let (job_ctx, rx) = JobCtx::new();
-
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.config.num_workers)
             .build()?;
-        jobs::start_job(self.config.path.clone(), pool, job_ctx)?;
+
+        let (job_ctx, rx) = JobCtx::new(pool);
+
+        jobs::start_job(self.config.path.clone(), job_ctx)?;
 
         let mut pipe_output = get_pipe_output(self.config.result_filepath.clone())?;
 
