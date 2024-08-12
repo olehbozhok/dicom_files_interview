@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use dicom::dictionary_std::tags;
-use dicom::object::{open_file, AccessError, DicomObject, FileDicomObject, ReadError};
+use dicom::object::{open_file, AccessError, FileDicomObject, ReadError};
 
 #[derive(Error, Debug)]
 pub enum DicomError {
-    #[error("could not read dicom file: {0}")]
-    Read(#[from] ReadError),
+    #[error("could not read file as dicom: {0}, path: {1}")]
+    Read(ReadError, PathBuf),
 
     #[error("could not handle patient name: {0}, path: {1}")]
     PatientName(PatientNameErr, PathBuf),
@@ -53,7 +53,7 @@ fn get_patient_id(obj: &File) -> Result<String, PatientIDErr> {
 }
 
 pub fn handle_file(path: PathBuf) -> Result<DicomFileData, DicomError> {
-    let obj = open_file(&path)?;
+    let obj = open_file(&path).map_err(|err| DicomError::Read(err, path.clone()))?;
     Ok(DicomFileData {
         patient_id: get_patient_id(&obj).map_err(|err| DicomError::PatientID(err, path.clone()))?,
         patient_name: get_patient_name(&obj)
