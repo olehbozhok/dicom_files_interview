@@ -1,4 +1,4 @@
-
+use std::io;
 use thiserror::Error;
 
 use crate::app_config::Cli;
@@ -9,10 +9,15 @@ use jobs::JobError;
 
 mod dicom_file_reader;
 
+mod display_strategy;
+use display_strategy::{DisplayFormat, DisplayStrategy};
+
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("error on handle job: {0}")]
-    IO(#[from] JobError),
+    Job(#[from] JobError),
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
 }
 
 pub struct App {
@@ -33,8 +38,13 @@ impl App {
             .unwrap();
         jobs::start_job(self.config.path.clone(), pool, job_ctx)?;
 
-        while let Ok(msg) = rx.recv() {
-            println!("{msg:?}");
+        let mut pipe_output = io::stdout();
+
+        let display_formatter = DisplayStrategy::new(self.config.output_format);
+
+        display_formatter.display_headers(&mut pipe_output)?;
+        while let Ok(file_data) = rx.recv() {
+            display_formatter.display_element(&file_data, &mut pipe_output)?
         }
 
         Ok(())
