@@ -1,4 +1,7 @@
+use std::fs::File;
 use std::io;
+use std::io::Write;
+use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::app_config::Cli;
@@ -18,6 +21,8 @@ pub enum AppError {
     Job(#[from] JobError),
     #[error("{0}")]
     Other(#[from] anyhow::Error),
+    #[error("{0}")]
+    OutputError(#[from] OutputError),
 }
 
 pub struct App {
@@ -38,7 +43,7 @@ impl App {
             .unwrap();
         jobs::start_job(self.config.path.clone(), pool, job_ctx)?;
 
-        let mut pipe_output = io::stdout();
+        let mut pipe_output = get_pipe_output(self.config.result_filepath.clone())?;
 
         let display_formatter = DisplayStrategy::new(self.config.output_format);
 
@@ -49,4 +54,18 @@ impl App {
 
         Ok(())
     }
+}
+
+#[derive(Error, Debug)]
+pub enum OutputError {
+    #[error("could not open result file: {0}")]
+    OpenFile(#[from] io::Error),
+}
+
+fn get_pipe_output(file_path: Option<PathBuf>) -> Result<Box<dyn Write>, OutputError> {
+    let pipe: Box<dyn Write> = match file_path {
+        Some(path) => Box::new(File::create(path)?),
+        None => Box::new(io::stdout()),
+    };
+    Ok(pipe)
 }
