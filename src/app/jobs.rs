@@ -19,7 +19,7 @@ pub enum JobError {
     RayonBuild(#[from] rayon::ThreadPoolBuildError),
 
     #[error("could not handle dicom file: {0}")]
-    Dicom(#[from] DicomError),
+    Dicom(#[from] Box<DicomError>),
 }
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ struct DirJob(PathBuf);
 
 impl DirJob {
     /// read folder and create list of jobs for each entry
-    fn scan_jobs<'a>(self) -> Result<Vec<JobsType>, JobError> {
+    fn scan_jobs(self) -> Result<Vec<JobsType>, JobError> {
         fs::read_dir(&self.0)
             .map_err(|err| JobError::Dir(self.0, err))?
             .map(|res| res.map(|e| e.path()).map_err(Into::<JobError>::into))
@@ -73,7 +73,7 @@ impl JobCtx {
 struct FileJob(PathBuf);
 
 impl FileJob {
-    fn do_job<'a>(self, ctx: JobCtx) -> Result<(), JobError> {
+    fn do_job(self, ctx: JobCtx) -> Result<(), JobError> {
         let file_data = dicom_file_reader::handle_file(self.0.clone())?;
         ctx.send(file_data);
         Ok(())
@@ -84,7 +84,7 @@ impl FileJob {
 struct UndefinedPathJob(PathBuf);
 
 impl UndefinedPathJob {
-    fn do_job<'a>(self) -> Result<(), JobError> {
+    fn do_job(self) -> Result<(), JobError> {
         Err(JobError::UndefinedPath(self.0))
     }
 }

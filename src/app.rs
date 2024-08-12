@@ -1,3 +1,4 @@
+use rayon::ThreadPoolBuildError;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -5,7 +6,6 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use crate::app_config::Cli;
-
 mod jobs;
 use jobs::JobCtx;
 use jobs::JobError;
@@ -23,6 +23,8 @@ pub enum AppError {
     Other(#[from] anyhow::Error),
     #[error("{0}")]
     OutputError(#[from] OutputError),
+    #[error("could not build thread pool: {0}")]
+    ThreadPoolBuild(#[from] ThreadPoolBuildError),
 }
 
 pub struct App {
@@ -39,8 +41,7 @@ impl App {
 
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.config.num_workers)
-            .build()
-            .unwrap();
+            .build()?;
         jobs::start_job(self.config.path.clone(), pool, job_ctx)?;
 
         let mut pipe_output = get_pipe_output(self.config.result_filepath.clone())?;

@@ -52,7 +52,7 @@ fn get_patient_id(obj: &File) -> Result<String, PatientIDErr> {
     Ok(patient_name.to_string())
 }
 
-pub fn handle_file(path: PathBuf) -> Result<DicomFileData, DicomError> {
+pub fn handle_file(path: PathBuf) -> Result<DicomFileData, Box<DicomError>> {
     let obj = open_file(&path).map_err(|err| DicomError::Read(err, path.clone()))?;
     Ok(DicomFileData {
         patient_id: get_patient_id(&obj).map_err(|err| DicomError::PatientID(err, path.clone()))?,

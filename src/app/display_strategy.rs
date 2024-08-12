@@ -34,7 +34,7 @@ impl DisplayFormat for CsvDisplay {
         let mut writer = csv::Writer::from_writer(output);
 
         writer
-            .write_record(&["Patient ID", "Patient Name", "File Path"])
+            .write_record(["Patient ID", "Patient Name", "File Path"])
             .context("could not write csv headers")?;
         Ok(())
     }
@@ -44,7 +44,7 @@ impl DisplayFormat for CsvDisplay {
 
         let path = data.path.to_string_lossy().to_string();
         writer
-            .write_record(&[
+            .write_record([
                 data.patient_id.as_str(),
                 data.patient_name.as_str(),
                 path.as_str(),
